@@ -26,3 +26,10 @@ npx decky-toolkit dev   # deploy to a paired device and live-sync changes
 
 See [docs/design.md](docs/design.md) for the architecture and roadmap, [docs/romm-api.md](docs/romm-api.md) for the
 RomM endpoints used.
+
+## License
+
+ChickenTender is free software under the GNU Affero General Public License, version 3 ([LICENSE](LICENSE)).
+
+It started from the [Decky plugin template](https://github.com/SteamDeckHomebrew/decky-plugin-template), which is
+BSD 3-Clause; that notice is kept in [LICENSES/BSD-3-Clause.txt](LICENSES/BSD-3-Clause.txt).

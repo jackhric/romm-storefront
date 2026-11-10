@@ -14,7 +14,7 @@
     "decky-plugin"
   ],
   "author": "Jack Hric",
-  "license": "BSD-3-Clause",
+  "license": "AGPL-3.0-only",
   "devDependencies": {
     "@decky/ui": "^4.11.0",
     "@types/react": "19.1.1",
