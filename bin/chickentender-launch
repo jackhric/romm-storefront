@@ -1,0 +1,11 @@
+#!/bin/bash
+# Steam shortcut launcher: chickentender-launch <es-de system> <rom path>. Refuses while the download is unfinished,
+# then hands the ROM to RetroDECK, which picks the emulator ES-DE configured for that system.
+set -u
+system="${1:-}"; rom="${2:-}"
+if [[ -z "$system" || -z "$rom" ]]; then echo "usage: chickentender-launch <system> <rom>" >&2; exit 2; fi
+if [[ -e "$rom.part" ]] || { [[ -d "$rom" ]] && compgen -G "$rom/*.part" >/dev/null; }; then
+  echo "ChickenTender: $rom is still downloading" >&2; exit 1
+fi
+if [[ ! -e "$rom" ]]; then echo "ChickenTender: $rom is not on this device" >&2; exit 1; fi
+exec flatpak run net.retrodeck.retrodeck -s "$system" "$rom"

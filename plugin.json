@@ -1,0 +1,11 @@
+{
+  "name": "ChickenTender",
+  "author": "Jack Hric",
+  "flags": [],
+  "api_version": 1,
+  "publish": {
+    "tags": [],
+    "description": "ChickenTender.",
+    "image": "https://opengraph.githubassets.com/1/SteamDeckHomebrew/PluginLoader"
+  }
+}
