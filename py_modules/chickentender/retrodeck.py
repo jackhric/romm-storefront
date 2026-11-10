@@ -41,8 +41,3 @@ def detect(home: str) -> RetroDeck:
         version=version,
         roms_path=roms_path,
     )
-
-
-def launch_command(rom_path: str, system: str) -> list[str]:
-    """RetroDECK picks the emulator ES-DE configured for `system` (the roms subfolder name)."""
-    return ["flatpak", "run", APP_ID, "-s", system, rom_path]

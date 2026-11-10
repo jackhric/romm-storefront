@@ -2,7 +2,6 @@
 import time
 from dataclasses import dataclass, field
 
-from .install import InstallLocation
 from .romm import RommClient
 from .sgdb import KINDS as ART_KINDS
 
@@ -142,13 +141,10 @@ class Library:
             })
         return out
 
-    def snapshot(self, location: InstallLocation, status_of, art_of=None) -> dict:
+    def snapshot(self, status_of, art_of=None) -> dict:
         games = []
         for g in sorted(self.games.values(), key=lambda g: (g.platform.lower(), g.name.lower())):
             status = status_of(g.rom_id)
-            if status is None:
-                t = location.target(g.slug, g.fs_name, g.single_file)
-                status = "installed" if t.installed else "partial" if t.partial else "available"
             games.append({
                 "rom_id": g.rom_id, "name": g.name, "platform_id": g.platform_id, "platform": g.platform,
                 "slug": g.slug, "size_bytes": g.size_bytes, "cover": g.cover, "cover_large": g.cover_large,

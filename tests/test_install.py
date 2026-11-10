@@ -44,3 +44,4 @@ def test_launch_file_prefers_playlist_then_cue(tmp_path):
     open(os.path.join(t.path, "G.m3u"), "wb").close()
     assert launch_file(t) == os.path.join(t.path, "G.m3u")
     assert launch_file(loc.target("nes", "a.nes", single_file=True)) == os.path.join(loc.platform_dir("nes"), "a.nes")
+

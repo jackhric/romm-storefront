@@ -68,6 +68,9 @@ class Plugin:
     async def remove(self, rom_id: int) -> dict:
         return await self.app.remove(rom_id)
 
+    async def verify(self, rom_id: int) -> dict:
+        return await self.app.verify(rom_id)
+
     async def download_control(self, action: str, appid: int = 0, value: int = 0) -> dict:
         return await self.app.download_control(action, appid, value)
 
@@ -94,9 +97,6 @@ class Plugin:
 
     async def game_video(self, rom_id: int) -> dict:
         return await self.app.game_video(rom_id)
-
-    async def set_layout(self, layout: str) -> dict:
-        return await self.app.set_layout(layout)
 
     async def set_roms_dir(self, path: str) -> dict:
         return await self.app.set_roms_dir(path)

@@ -15,8 +15,10 @@ from typing import Any
 import aiohttp
 
 from .artwork import ArtCache, ArtPrefetch
-from .downloads import Downloader, Job
-from .install import DEFAULT_ROMS_DIR, InstallLocation, launch_file
+from . import ledger as L
+from .downloads import Downloader, Job, as_game, manifest
+from .install import DEFAULT_ROMS_DIR, InstallLocation, Target, launch_file
+from .ledger import Install, Ledger
 from .library import Library
 from .pairing import DevicePairing
 from . import retrodeck
@@ -67,6 +69,7 @@ class App:
         self.videos = VideoResolver(log=logger)
         self.retrodeck = retrodeck.detect(home)
         self.shortcuts = ShortcutMap(os.path.join(os.path.dirname(settings_path), "shortcuts.json"))
+        self.ledger = Ledger(os.path.join(os.path.dirname(settings_path), "installs.json"), logger)
         self.launcher = ""
         self.runtime_dir = ""
         self.location = InstallLocation(self.settings.roms_dir or self.retrodeck.roms_path or DEFAULT_ROMS_DIR, home)
@@ -120,28 +123,108 @@ class App:
 
     def _start_paired(self) -> None:
         assert self.client
-        self.downloader = Downloader(self.client, self.location, self._progress, self._finished)
+        self.downloader = Downloader(self.client, self.location, self._progress, self._finished, self.ledger)
+        self.downloader.restore(self.shortcuts.appid)
         self._refresh_task = asyncio.create_task(self._refresh_loop())
 
     # Snapshot
     def state(self) -> dict:
         s = self.settings
-        status_of = self.downloader.status_of if self.downloader else (lambda rom_id: None)
         return {
             "server": {"url": s.server_url, **self.server},
             "pairing": self.pairing.state.as_dict() if self.pairing else {"status": "idle"},
             "account": {"paired": s.paired, "username": s.username, "device_id": s.device_id,
                         "device_name": self.identity["name"]},
-            "library": self.library.snapshot(self.location, status_of, lambda g: self.art.urls(g.rom_id, g.sgdb_id, g.name)),
+            "library": self.library.snapshot(self.status, lambda g: self.art.urls(g.rom_id, g.sgdb_id, g.name)),
             "downloads": self.downloader.snapshot() if self.downloader else {"active": None, "queue": [], "roms_dir": self.location.roms_dir},
+            "installs": self.installs(),
+            "installed": self.installed(),
             "roms_dir_exists": self.location.exists,
             "retrodeck": self.retrodeck.as_dict(),
             "sgdb": {"configured": self.sgdb is not None, "error": self.sgdb_error,
                      "art_ready": self.art.count(self.library.games.values()), "art_total": len(self.library.games),
                      "signin": self.signin.as_dict()},
-            "layout": s.layout,
             "version": self.version,
         }
+
+    def _target(self, install: Install) -> Target:
+        return self.location.target(install.slug, install.fs_name, install.single_file)
+
+    def status(self, rom_id: int) -> str:
+        """A game's state: the ledger's, except that an installed game with files gone reads as incomplete."""
+        install = self.ledger.get(rom_id)
+        if not install:
+            return "available"
+        if install.state == L.INSTALLED and not L.check(install, self._target(install).path).complete:
+            return L.INCOMPLETE
+        return install.state
+
+    def installs(self) -> list[dict]:
+        """Every game the ledger knows, held against the disk."""
+        out = []
+        for i in self.ledger.all():
+            seen = L.check(i, self._target(i).path)
+            out.append({"rom_id": i.rom_id, "name": i.name, "state": self.status(i.rom_id), "appid": self.shortcuts.appid(i.rom_id),
+                        "bytes_done": seen.done_bytes, "bytes_total": seen.total_bytes, "missing": list(seen.missing),
+                        "error": i.error, "queued_at": i.queued_at, "updated_at": i.updated_at, "completed_at": i.completed_at})
+        return out
+
+    def installed(self) -> list[dict]:
+        """Complete games that have a Steam shortcut, with what Steam's storage pages show for an installed app."""
+        out = []
+        for i in self.ledger.all():
+            appid, target = self.shortcuts.appid(i.rom_id), self._target(i)
+            seen = L.check(i, target.path)
+            if not appid or i.state != L.INSTALLED or not seen.complete:
+                continue
+            try:
+                device = os.stat(target.path).st_dev
+            except OSError:
+                continue
+            out.append({"rom_id": i.rom_id, "appid": appid, "name": i.name, "path": target.path,
+                        "folder": target.path if target.is_dir else os.path.dirname(target.path),
+                        "bytes": seen.done_bytes, "device": device})
+        return out
+
+    async def adopt(self) -> None:
+        """Games found on disk that the ledger does not know (from before it existed, or after it was lost) get a
+        record: RomM's file list decides whether each is installed or incomplete."""
+        if not self.client:
+            return
+        changed = False
+        for game in list(self.library.games.values()):
+            if self.ledger.get(game.rom_id):
+                continue
+            target = self.location.target(game.slug, game.fs_name, game.single_file)
+            if not (target.installed or target.partial):
+                continue
+            try:
+                files = manifest(await self.client.rom(game.rom_id), target)
+            except Exception as e:
+                self.log.warning("could not check %s found on disk: %s", game.name, e)
+                continue
+            install = Install(rom_id=game.rom_id, name=game.name, slug=game.slug, fs_name=game.fs_name, single_file=game.single_file,
+                              size_bytes=game.size_bytes, files=files, state=L.INCOMPLETE)
+            if L.check(install, target.path).complete:
+                install.state = L.INSTALLED
+            self.ledger.put(install)
+            changed = True
+        if changed:
+            self._changed()
+
+    async def verify(self, rom_id: int) -> dict:
+        """Asks RomM for the game's files again and holds the disk against them."""
+        install = self.ledger.get(int(rom_id))
+        if not install or not self.client:
+            raise ValueError("Unknown game")
+        if install.state not in L.IN_QUEUE:
+            files = manifest(await self.client.rom(install.rom_id), self._target(install))
+            install = self.ledger.update(install.rom_id, files=files)
+            complete = L.check(install, self._target(install).path).complete
+            if complete != (install.state == L.INSTALLED):
+                self.ledger.update(install.rom_id, state=L.INSTALLED if complete else L.INCOMPLETE)
+        self._changed()
+        return self.state()
 
     def _changed(self) -> None:
         asyncio.get_event_loop().create_task(self._emit(STATE_EVENT, self.state()))
@@ -182,7 +265,7 @@ class App:
         await self._probe_server(emit=False)
         if self.settings.server_url != url:
             await self.prefetch.stop()
-            self.settings = Settings(server_url=url, roms_dir=self.settings.roms_dir, sgdb_key=self.settings.sgdb_key, layout=self.settings.layout)
+            self.settings = Settings(server_url=url, roms_dir=self.settings.roms_dir, sgdb_key=self.settings.sgdb_key)
             self.store.save(self.settings)
             self.library = Library()
         self._changed()
@@ -257,7 +340,7 @@ class App:
         if self.client:
             await self.client.close()
             self.client = None
-        self.settings = Settings(roms_dir=self.settings.roms_dir, sgdb_key=self.settings.sgdb_key, layout=self.settings.layout)
+        self.settings = Settings(roms_dir=self.settings.roms_dir, sgdb_key=self.settings.sgdb_key)
         self.store.save(self.settings)
         self.server = {"version": "", "error": ""}
         self.library = Library()
@@ -273,6 +356,8 @@ class App:
             elif not self.library.error and self.sgdb and not self.sgdb_error and not self.prefetch.running:
                 self.prefetch.start(self.sgdb, self.library.games.values())
             self._changed()
+            if not self.library.error:
+                await self.adopt()
         return self.state()
 
     async def _refresh_loop(self) -> None:
@@ -288,12 +373,6 @@ class App:
         if not game or not self.client:
             raise ValueError("Unknown game")
         return game.details(self.client)
-
-    async def set_layout(self, layout: str) -> dict:
-        self.settings.layout = str(layout)[:32]
-        self.store.save(self.settings)
-        self._changed()
-        return self.state()
 
     async def game_video(self, rom_id: int) -> dict:
         """Direct stream addresses for the game's trailer ("" each when it has none or it cannot be resolved)."""
@@ -464,6 +543,7 @@ class App:
         return self.state()
 
     async def set_shortcut(self, rom_id: int, appid: int) -> dict:
+        """Records the game's Steam shortcut; appid 0 forgets one Steam no longer has."""
         game = self.library.games.get(int(rom_id))
         if not game:
             raise ValueError("Unknown game")
@@ -474,23 +554,25 @@ class App:
         return self.state()
 
     async def remove(self, rom_id: int) -> dict:
-        """Deletes the game's files; the frontend removes the Steam shortcut with the appid returned in `removed`."""
-        game = self.library.games.get(int(rom_id))
-        if not game:
+        """Deletes the game's files and its record, whatever state it is in; the frontend removes the Steam shortcut
+        with the appid returned in `removed`."""
+        rom_id = int(rom_id)
+        install, game = self.ledger.get(rom_id), self.library.games.get(rom_id)
+        if not install and not game:
             raise ValueError("Unknown game")
         if self.downloader:
-            await self.downloader.cancel(game.rom_id)
-            self.downloader.forget(game.rom_id)
-        target = self.location.target(game.slug, game.fs_name, game.single_file)
+            await self.downloader.drop(rom_id)
+        target = self._target(install) if install else self.location.target(game.slug, game.fs_name, game.single_file)
         for path in (target.path, target.path + ".part"):
             if os.path.isdir(path):
                 shutil.rmtree(path, ignore_errors=True)
             elif os.path.exists(path):
                 os.unlink(path)
-        icon = self._icon_path(game.rom_id)
+        icon = self._icon_path(rom_id)
         if icon and os.path.exists(icon):
             os.unlink(icon)
-        appid = self.shortcuts.forget(game.rom_id)
+        self.ledger.remove(rom_id)
+        appid = self.shortcuts.forget(rom_id)
         self._changed()
         return {"removed": appid, **self.state()}
 
@@ -513,7 +595,11 @@ class App:
             if action == "pause":
                 await d.pause(rom_id)
             elif action == "resume":
-                await d.resume(rom_id)
+                install = self.ledger.get(rom_id)
+                if install and install.state in (L.INCOMPLETE, L.FAILED):
+                    d.add(as_game(install), int(appid))  # Steam's Resume on a download that had stopped
+                else:
+                    await d.resume(rom_id)
             elif action == "cancel":
                 await d.cancel(rom_id)
             elif action == "move":

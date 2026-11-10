@@ -90,10 +90,6 @@ class SgdbClient:
         self._session = None
         self._sem = asyncio.Semaphore(2)
 
-    @property
-    def configured(self) -> bool:
-        return bool(self._key)
-
     async def close(self) -> None:
         if self._session is not None:
             await self._session.close()
