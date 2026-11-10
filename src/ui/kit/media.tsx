@@ -1,6 +1,6 @@
 // Video and screenshots: the muted autoplaying trailer, the hero art it plays over, and the store's media slides.
 import { Focusable, GamepadButton, GamepadEvent, ModalRoot, NavEntryPositionPreferences, showModal } from "@decky/ui";
-import { CSSProperties, ReactNode, RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { CSSProperties, ReactNode, RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaPlay } from "react-icons/fa";
 import { videoBroke, VideoSource } from "../hooks";
@@ -198,17 +198,23 @@ interface HeroArtProps {
   fadeTo: string;
   /** Darkens the left side for text placed over the art. */
   shadeLeft?: boolean;
+  /** Drifts slowly into the picture while it is shown. */
+  drift?: boolean;
   style?: CSSProperties;
   children?: ReactNode;
 }
 
 /** Full-width hero art like the library game page's header: the image, Steam's top gradient, a fade into the page. */
-export function HeroArt({ src, height, video, playVideo = true, fadeTo, shadeLeft, style, children }: HeroArtProps) {
+export function HeroArt({ src, height, video, playVideo = true, fadeTo, shadeLeft, drift, style, children }: HeroArtProps) {
+  // A slow, slight zoom towards a point picked anew for each picture.
+  const towards = useMemo(() => `${20 + Math.round(Math.random() * 60)}% ${20 + Math.round(Math.random() * 60)}%`, [src]);
   return (
     <div style={{ position: "relative", height, overflow: "hidden", background: C.ink, ...style }}>
-      {/* The thumbnail shows at once; the full picture fades in over it. */}
-      {src && thumbsOf(src)[0] !== src && <Art src={src} small eager style={{ position: "absolute", inset: 0 }} />}
-      <Art src={src} bare eager style={{ position: "absolute", inset: 0 }} />
+      <div key={drift ? src : undefined} className={drift ? "ctk-drift" : undefined} style={{ position: "absolute", inset: 0, transformOrigin: towards }}>
+        {/* The thumbnail shows at once; the full picture fades in over it. */}
+        {src && thumbsOf(src)[0] !== src && <Art src={src} small eager style={{ position: "absolute", inset: 0 }} />}
+        <Art src={src} bare eager style={{ position: "absolute", inset: 0 }} />
+      </div>
       <AmbientVideo source={video} active={playVideo} />
       <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 75, background: "linear-gradient(rgba(0,0,0,.5) 0%, rgba(0,0,0,0) 100%)" }} />
       <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to bottom, transparent 55%, ${fadeTo} 100%)${shadeLeft ? ", linear-gradient(to right, rgba(0,0,0,.75) 0%, rgba(0,0,0,.45) 35%, transparent 70%)" : ""}` }} />

@@ -1,7 +1,11 @@
 // The only file that knows the backend's method and event names.
 import { addEventListener, callable, removeEventListener } from "@decky/api";
 
-export type GameStatus = "available" | "partial" | "queued" | "downloading" | "installed";
+/** The install ledger's state for a game (py_modules/chickentender/ledger.py); "available" has no record. */
+export type GameStatus = "available" | "queued" | "downloading" | "paused" | "incomplete" | "failed" | "installed";
+/** Stopped short of installed: Resume continues it, Remove clears it. */
+export const isStopped = (status: GameStatus) => status === "paused" || status === "incomplete" || status === "failed";
+export const STOPPED_TEXT: Record<"paused" | "incomplete" | "failed", string> = { paused: "Paused", incomplete: "Partly downloaded", failed: "Download failed" };
 
 export interface Game {
   rom_id: number;
@@ -104,17 +108,37 @@ export type SgdbSigninStage = "" | "opening" | "login" | "consent" | "reading" |
 /** "Sign in with Steam": the backend follows Steam's browser to SteamGridDB; `error` is set on "failed". */
 export interface SgdbSignin { active: boolean; stage: SgdbSigninStage; error: string }
 
+/** A finished game that has a Steam shortcut, as Steam's storage pages need it. */
+export interface InstalledGame { rom_id: number; appid: number; name: string; path: string; folder: string; bytes: number; device: number }
+
+/** One record of the install ledger, held against the disk. */
+export interface Install {
+  rom_id: number;
+  name: string;
+  state: Exclude<GameStatus, "available">;
+  /** The Steam shortcut the backend has on record, 0 for none. */
+  appid: number;
+  bytes_done: number;
+  bytes_total: number;
+  /** Listed files that are absent or short. */
+  missing: string[];
+  error: string;
+  queued_at: number;
+  updated_at: number;
+  completed_at: number;
+}
+
 export interface State {
   server: { url: string; version: string; error: string };
   pairing: { status: "idle" | "waiting" | "approved" | "expired" | "denied" | "error"; user_code?: string; verification_url?: string; expires_at?: number; error?: string };
   account: { paired: boolean; username: string; device_id: string; device_name: string };
   library: { platforms: Platform[]; games: Game[]; recommended: Recommendation[]; loaded_at: number; loading: boolean; error: string };
   downloads: { active: Progress | null; queue: number[]; items: DownloadItem[]; roms_dir: string };
+  installs: Install[];
+  installed: InstalledGame[];
   roms_dir_exists: boolean;
   retrodeck: { installed: boolean; initialised: boolean; version: string; roms_path: string };
   sgdb: { configured: boolean; error: string; art_ready: number; art_total: number; signin: SgdbSignin };
-  /** The storefront layout picked in the panel; "" for the default. */
-  layout: string;
   version: string;
 }
 
@@ -144,6 +168,8 @@ export const SGDB_HOME = "https://www.steamgriddb.com/";
 export const gameArt = callable<[rom_id: number], GameArt>("game_art");
 export const artBase64 = callable<[rom_id: number, kind: ArtKind], ArtBytes>("art_base64");
 export const setShortcut = callable<[rom_id: number, appid: number], State>("set_shortcut");
+/** Fetches RomM's file list for the game again and checks the disk against it. */
+export const verifyGame = callable<[rom_id: number], State>("verify");
 export const removeGame = callable<[rom_id: number], State & { removed: number }>("remove");
 const backendDownload = callable<[rom_id: number, appid: number], State>("download");
 
@@ -167,7 +193,6 @@ export async function download(rom_id: number): Promise<State> {
 }
 /** Direct stream addresses for the game's trailer at about 360p and 720p (both silent) and its sound; "" when not resolved. */
 export const gameVideo = callable<[rom_id: number], { rom_id: number; small: string; large: string; audio: string }>("game_video");
-export const setLayout = callable<[layout: string], State>("set_layout");
 export const setRomsDir = callable<[path: string], State>("set_roms_dir");
 
 const STATE_EVENT = "chickentender_state";

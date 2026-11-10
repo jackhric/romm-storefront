@@ -1,13 +1,15 @@
-// The three route pages: each guards, loads and gates, then hands over to the layout picked in the panel.
+// The three route pages: each guards, loads and gates, then hands over to the page itself.
 import { SteamSpinner, useParams } from "@decky/ui";
 import { ReactNode, useMemo } from "react";
 import { State } from "../api";
 import { useBackendState, useProgress } from "../state";
-import { useGameData } from "./game/parts";
+import { useGameData } from "./game/data";
 import { C, Page } from "./kit";
-import { Guard } from "./store/Page";
+import { Guard } from "./kit/guard";
 import { needsSetup, SetupPage } from "./store/Setup";
-import { variantFor } from "./variants";
+import { Console } from "./store/ConsolePage";
+import { StoreGame } from "./game/GamePage";
+import { Store } from "./store/Discover";
 
 function Message({ children }: { children: ReactNode }) {
   return <Page><div style={{ padding: "120px 38px", fontSize: 18, color: C.subtitle }}>{children}</div></Page>;
@@ -31,7 +33,6 @@ function StoreRoute() {
   const waiting = gate(state);
   if (waiting || !state) return <>{waiting}</>;
   if (!state.library.games.length) return <Message>{state.library.error ? `Could not load the library: ${state.library.error}` : "No games on this RomM server yet."}</Message>;
-  const { Store } = variantFor(state.layout);
   return <Store state={state} progress={progress} />;
 }
 
@@ -46,8 +47,7 @@ function GameRoute({ romId }: { romId: number }) {
   const waiting = gate(state);
   if (waiting || !state) return <>{waiting}</>;
   if (!data) return <Message>This game is not in your RomM library any more.</Message>;
-  const { Game } = variantFor(state.layout);
-  return <Game state={state} data={data} />;
+  return <StoreGame state={state} data={data} />;
 }
 
 export function ConsolePage() {
@@ -64,6 +64,5 @@ function ConsoleRoute({ platformId }: { platformId: number }) {
   if (waiting || !state) return <>{waiting}</>;
   const platform = state.library.platforms.find((p) => p.id === platformId);
   if (!platform || !games.length) return <Message>{platform ? `No ${platform.name} games on your RomM server.` : "This console is not in your RomM library any more."}</Message>;
-  const { Console } = variantFor(state.layout);
   return <Console state={state} platform={platform} games={games} progress={progress} />;
 }

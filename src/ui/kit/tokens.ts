@@ -30,10 +30,8 @@ export const C = {
 export const FONT = v("font-family", '"Motiva Sans", Arial, sans-serif');
 export const EASE = "cubic-bezier(.16,.86,.43,.99)";
 
-/** Native page gutter; the store's own pages use 50. */
+/** Native page gutter. */
 export const GUTTER = 38;
-export const STORE_GUTTER = 50;
-export const TOP_BAR = 40;
 export const FOOTER = 42;
 export const GAP = 12;
 
@@ -50,6 +48,8 @@ export const KIT_CSS = `
 .ctk-fade { animation: ctk-fade .4s ease-out; }
 .ctk-skel { background: #2a2e37; }
 @keyframes ctk-fade { from { opacity: 0; } to { opacity: 1; } }
+.ctk-drift { animation: ctk-drift 32s linear forwards; }
+@keyframes ctk-drift { from { transform: scale(1); } to { transform: scale(1.07); } }
 
 /* Steam's focus ring, drawn on the element itself: Steam's own ring is an overlay placed once at focus time, so it
    neither follows a gliding scroll nor stays under the top bar. Values measured from the client. */

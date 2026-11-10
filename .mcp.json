@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "decky": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "decky-toolkit",
+        "mcp"
+      ]
+    }
+  }
+}

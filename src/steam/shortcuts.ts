@@ -1,6 +1,7 @@
 // Steam library shortcuts for downloaded games, through SteamClient.Apps. Every call checks the internal first and
 // returns 0/false instead of throwing, so the download flow works without a shortcut when Steam changes.
-import { tweak, warnOnce } from "./tweak";
+import { appsLoaded, client, collectionStore, overview as overviewOf } from "./core/steam";
+import { tweak, warnOnce } from "./core/tweak";
 
 type Apps = {
   AddShortcut(name: string, exe: string, startDir: string, launchOptions: string): Promise<number>;
@@ -18,10 +19,15 @@ const GRID_PORTRAIT = 0;
 const COLLECTION = "RomM";
 
 function apps(): Apps | undefined {
-  const a = (window as any).SteamClient?.Apps;
+  const a = client("Apps");
   const ok = ["AddShortcut", "RemoveShortcut", "SetShortcutName", "SetShortcutExe", "SetShortcutStartDir", "SetShortcutLaunchOptions"]
     .every((m) => typeof a?.[m] === "function");
   return ok ? a : undefined;
+}
+
+/** Whether Steam still has the shortcut; undefined until its app list has loaded (a missing overview means nothing before that). */
+export function hasShortcut(appid: number): boolean | undefined {
+  return appsLoaded() ? !!overviewOf(appid) : undefined;
 }
 
 /** Steam's own "Add a Non-Steam Game" quotes a path only when it needs it; quoting a plain one trips an assertion. */
@@ -45,7 +51,7 @@ export async function ensureShortcut(t: LaunchTarget): Promise<number> {
   if (!a) return 0;
   try {
     let appid = t.appid;
-    if (!appid || !(window as any).appStore?.GetAppOverviewByAppID?.(appid)) {
+    if (!appid || !overviewOf(appid)) {
       appid = Number(await a.AddShortcut(t.name, q(t.exe), q(t.start_dir), t.launch_options));
       if (!appid) return 0;
       // Steam reads the icon file into the app overview only when it first sends it, right after AddShortcut; set
@@ -69,7 +75,7 @@ export async function ensureShortcut(t: LaunchTarget): Promise<number> {
 export async function waitForOverview(appid: number, timeoutMs = 4000): Promise<boolean> {
   const until = Date.now() + timeoutMs;
   while (Date.now() < until) {
-    if ((window as any).appStore?.GetAppOverviewByAppID?.(appid)) return true;
+    if (overviewOf(appid)) return true;
     await new Promise((r) => setTimeout(r, 100));
   }
   return false;
@@ -79,8 +85,8 @@ export function removeShortcut(appid: number): void {
   const a = apps();
   if (!a || !appid) return;
   try {
-    const cs = (window as any).collectionStore;
-    const overview = (window as any).appStore?.GetAppOverviewByAppID?.(appid);
+    const cs = collectionStore();
+    const overview = overviewOf(appid);
     const col = cs?.userCollections?.find?.((c: any) => c?.displayName === COLLECTION);
     if (overview && typeof col?.AsDragDropCollection === "function") col.AsDragDropCollection().RemoveApps([overview]);
   } catch (err) {
@@ -110,7 +116,7 @@ export async function setCapsule(appid: number, cover: { base64: string; format:
 
 /** Clears the hero and wide slots (or the given ones) so art.ts derives them from the capsule again. */
 export function clearDerivedArt(appid: number, types: number[] = [1, 3]): void {
-  const a = (window as any).SteamClient?.Apps;
+  const a = client("Apps");
   if (typeof a?.ClearCustomArtworkForApp !== "function") return;
   for (const type of types) {
     try {
@@ -124,8 +130,8 @@ export function clearDerivedArt(appid: number, types: number[] = [1, 3]): void {
 /** Puts the app in the "RomM" collection, creating it the way Steam's own UI does; skipped when the store differs. */
 export function addToCollection(appid: number): void {
   tweak("collection", () => {
-    const cs = (window as any).collectionStore;
-    const overview = (window as any).appStore?.GetAppOverviewByAppID?.(appid);
+    const cs = collectionStore();
+    const overview = overviewOf(appid);
     if (!cs || !overview || !Array.isArray(cs.userCollections)) return;
     let col = cs.userCollections.find((c: any) => c?.displayName === COLLECTION);
     if (!col) {
@@ -144,7 +150,7 @@ export function addToCollection(appid: number): void {
 /** Starts the shortcut the way the library's Play button does. */
 export function runShortcut(appid: number): void {
   const a = apps();
-  const gameid = (window as any).appStore?.GetAppOverviewByAppID?.(appid)?.m_gameid;
+  const gameid = overviewOf(appid)?.m_gameid;
   if (!a || typeof a.RunGame !== "function" || typeof gameid !== "string") return;
   try {
     a.RunGame(gameid, "", -1, 100);

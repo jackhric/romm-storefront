@@ -6,7 +6,6 @@ import { Game, Progress } from "../../api";
 import { formatSize } from "../../state";
 import { ConsoleEntry, isBusy, openConsolePage, reveal, useGameActions } from "../hooks";
 import { consoleLogo } from "../consoleLogos";
-import { ConsoleFace } from "../store/Consoles";
 import { coverOf, percent, prefetchDetails } from "../store/model";
 import { Art } from "./art";
 import { C, CAPSULE_W, FOOTER, GAP, GUTTER, KIT_CSS, WIDE_W } from "./tokens";
@@ -14,8 +13,9 @@ import { C, CAPSULE_W, FOOTER, GAP, GUTTER, KIT_CSS, WIDE_W } from "./tokens";
 export * from "./tokens";
 export * from "./media";
 export * from "./art";
-export { Title as Logo } from "../store/Title";
-export { Summary, openLightbox } from "../game/parts";
+export * from "./backdrop";
+export { Title as Logo } from "./Title";
+export { Summary } from "./Summary";
 
 const ellipsis: CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 
@@ -269,22 +269,6 @@ export function Button({ children, label, onClick, style }: { children: ReactNod
   );
 }
 
-/** The play bar's label-over-value pair. */
-export function Stat({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, lineHeight: "22px", letterSpacing: 0.5, textTransform: "uppercase", color: C.label, whiteSpace: "nowrap" }}>{label}</div>
-      <div style={{ fontSize: 16, fontWeight: 500, lineHeight: "20px", color: "#fff", ...ellipsis }}>{value}</div>
-    </div>
-  );
-}
-
-export function Stats({ items, gap = 20 }: { items: [string, ReactNode | undefined | ""][]; gap?: number }) {
-  const shown = items.filter(([, value]) => value);
-  if (!shown.length) return null;
-  return <div style={{ display: "flex", gap, minWidth: 0 }}>{shown.map(([label, value]) => <Stat key={label} label={label} value={value} />)}</div>;
-}
-
 interface PillTabsProps<K extends string> {
   tabs: { key: K; label: string }[];
   active: K;
@@ -329,32 +313,6 @@ export function InfoRow({ label, children }: { label: string; children: ReactNod
       <div style={{ flex: "0 0 42%", color: C.description, ...ellipsis }}>{label}</div>
       <div style={{ flex: 1, minWidth: 0, color: C.title, ...ellipsis }}>{children}</div>
     </div>
-  );
-}
-
-/** A square console tile that opens the console's page. */
-export function ConsoleTile({ entry, size = 160, onFocus }: { entry: ConsoleEntry; size?: number; onFocus?: (platformId: number) => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { platform, count } = entry;
-  return (
-    <Focusable
-      ref={ref}
-      className="ctk-tile ctk-ring ctk-lift"
-      noFocusRing
-      data-platform={platform.id}
-      onActivate={() => openConsolePage(platform.id)}
-      onOKActionDescription="Open"
-      onGamepadFocus={() => {
-        reveal(ref.current);
-        onFocus?.(platform.id);
-      }}
-      style={{ background: "none" }}
-    >
-      <ConsoleFace platform={platform} size={size}>
-        <div style={{ fontSize: 13, fontWeight: 500, lineHeight: "16px", color: C.title, ...ellipsis }}>{platform.name}</div>
-        <div style={{ fontSize: 11, lineHeight: "14px", color: C.description }}>{count} {count === 1 ? "game" : "games"}</div>
-      </ConsoleFace>
-    </Focusable>
   );
 }
 

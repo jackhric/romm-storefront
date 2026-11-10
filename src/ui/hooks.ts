@@ -3,9 +3,9 @@ import { toaster } from "@decky/api";
 import { ConfirmModal, Menu, MenuItem, Navigation, showContextMenu, showModal } from "@decky/ui";
 import { createElement, RefObject, useCallback, useEffect, useMemo, useState } from "react";
 import { removeFromDevice } from "../actions";
-import { cancelDownload, consoleRoute, download, Game, GameDetails, gameRoute, gameVideo, launchTarget, Platform, Progress, State } from "../api";
+import { cancelDownload, consoleRoute, download, Game, isStopped, STOPPED_TEXT, GameDetails, gameRoute, gameVideo, launchTarget, Platform, Progress, State } from "../api";
 import { formatSize } from "../state";
-import { runShortcut } from "../steam/shortcuts";
+import { runShortcut } from "../steam";
 import { forYouRow, laterRows, percent, recentRow, Row, topRated } from "./store/model";
 
 export const isBusy = (g: Game) => g.status === "queued" || g.status === "downloading";
@@ -22,9 +22,42 @@ export interface StoreModel {
   forYou?: Row;
   rated?: Row;
   installed?: Row;
-  /** The best-rated games that have hero art, for spotlights and carousels. */
+  /** A changing pick of the better-rated games that have hero art, for spotlights and carousels. */
   featured: Game[];
   consoles: ConsoleEntry[];
+}
+
+const FEATURED = 12;
+// Featured is drawn from this many of the best-rated games (a third of the library, within these bounds).
+const POOL_MIN = 24;
+const POOL_MAX = 60;
+// One draw lasts a visit (until the store has gone unused this long): coming back from a game page shows the same
+// picks, a later visit shows new ones.
+const ROTATION_MS = 20 * 60 * 1000;
+let rotation = { seed: 0, at: 0 };
+
+function rotationSeed(): number {
+  const now = Date.now();
+  const fresh = !rotation.at || now - rotation.at > ROTATION_MS;
+  rotation = { seed: fresh ? (Math.random() * 2 ** 32) >>> 0 : rotation.seed, at: now };
+  return rotation.seed;
+}
+
+/** The top of a best-first list in an order that changes with each visit. */
+function rotate(best: Game[]): Game[] {
+  const pool = best.slice(0, Math.min(POOL_MAX, Math.max(POOL_MIN, Math.ceil(best.length / 3))));
+  let a = rotationSeed();
+  const random = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), a | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 2 ** 32;
+  };
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool;
 }
 
 export function useStoreModel(state: State): StoreModel {
@@ -43,7 +76,7 @@ export function useStoreModel(state: State): StoreModel {
       forYou: forYouRow(games, recommended),
       rated: later.find((r) => r.key === "rated"),
       installed: later.find((r) => r.key === "installed"),
-      featured: (withArt.length >= 4 ? withArt : rated.length ? rated : games).slice(0, 12),
+      featured: rotate(withArt.length >= 4 ? withArt : rated.length ? rated : games).slice(0, FEATURED),
       consoles: platforms.filter((p) => counts.get(p.id)).map((p) => ({
         platform: p,
         count: counts.get(p.id) ?? 0,
@@ -83,7 +116,7 @@ export function useSort() {
 }
 
 export type ActionKind = "download" | "resume" | "stop" | "play";
-export const actionKind = (g: Game): ActionKind => (g.status === "installed" ? "play" : isBusy(g) ? "stop" : g.status === "partial" ? "resume" : "download");
+export const actionKind = (g: Game): ActionKind => (g.status === "installed" ? "play" : isBusy(g) ? "stop" : isStopped(g.status) ? "resume" : "download");
 const LABELS: Record<ActionKind, string> = { download: "Download", resume: "Resume", stop: "Stop download", play: "Play" };
 
 function confirmRemove(game: Game) {
@@ -116,7 +149,7 @@ export function useGameActions(game: Game, serverUrl = "") {
   const openMenu = useCallback((target?: any) => {
     const items = [
       createElement(MenuItem, { key: "act", onSelected: act }, LABELS[kind]),
-      game.status === "installed" && createElement(MenuItem, { key: "remove", tone: "destructive", onSelected: () => confirmRemove(game) }, "Remove from this device"),
+      (game.status === "installed" || isStopped(game.status)) && createElement(MenuItem, { key: "remove", tone: "destructive", onSelected: () => confirmRemove(game) }, "Remove from this device"),
       serverUrl && createElement(MenuItem, { key: "romm", onSelected: () => Navigation.NavigateToExternalWeb(`${serverUrl.replace(/\/$/, "")}/rom/${game.rom_id}`) }, "Open in RomM"),
     ].filter(Boolean);
     showContextMenu(createElement(Menu, { label: game.name }, items), target?.currentTarget ?? target ?? window);
@@ -131,7 +164,9 @@ export function statusText(game: Game, p?: Progress): string {
     case "installed": return "On this Device";
     case "queued": return "Queued";
     case "downloading": return "Starting…";
-    case "partial": return "Partly downloaded";
+    case "paused":
+    case "incomplete":
+    case "failed": return STOPPED_TEXT[game.status];
     default: return formatSize(game.size_bytes);
   }
 }
@@ -161,11 +196,6 @@ export function scoreWord(score: number): string {
 
 /** A plain video file, or YouTube's player; a file may name what to play when it cannot be loaded. */
 export type VideoSource = { kind: "file"; src: string; /** The sound, when the file itself is silent. */ audio?: string; fallback?: VideoSource } | { kind: "youtube"; id: string };
-export function videoOf(details?: GameDetails): VideoSource | undefined {
-  if (details?.video) return { kind: "file", src: details.video };
-  if (details?.youtube_video_id) return { kind: "youtube", id: details.youtube_video_id };
-  return undefined;
-}
 
 type Streams = { small: string; large: string; audio: string };
 const STREAMS_FRESH_MS = 2 * 3600 * 1000;

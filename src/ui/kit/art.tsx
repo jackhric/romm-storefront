@@ -8,9 +8,10 @@ const SGDB = /^(https:\/\/cdn\d*\.steamgriddb\.com)\/(grid|hero|logo|icon)\/([0-
 export function thumbsOf(url: string): string[] {
   const m = SGDB.exec(url);
   if (!m) return [url];
-  const [, origin, kind, hash, ext] = m;
-  // Measured on the CDN: grid thumbs are 267x400 or 419x196 JPEGs, hero thumbs 850x274, logo thumbs 500 px wide.
-  const thumb = kind === "grid" ? `thumb/${hash}.jpg` : kind === "hero" ? `hero_thumb/${hash}.${ext}` : `${kind}_thumb/${hash}.png`;
+  const [, origin, kind, hash] = m;
+  // Measured on the CDN: grid thumbs are 267x400 or 419x196 JPEGs, hero thumbs 850x274 JPEGs whatever the hero's
+  // own format (a PNG hero has no .png thumb), logo thumbs 500 px wide.
+  const thumb = kind === "grid" ? `thumb/${hash}.jpg` : kind === "hero" ? `hero_thumb/${hash}.jpg` : `${kind}_thumb/${hash}.png`;
   return [`${origin}/${thumb}`, url];
 }
 

@@ -4,13 +4,13 @@ import { FaDrumstickBite } from "react-icons/fa";
 import { ArtBytes, artBase64, coverBase64, download, downloadControl, GameArt, gameArt, getState, launchTarget, onProgress, onState, saveIcon, setDownloadPreparation, setShortcut, State, STORE_ROUTE, GAME_ROUTE, CONSOLE_ROUTE } from "./api";
 import { removeFromDevice } from "./actions";
 import { useBackendState } from "./state";
-import { launchIfRequested, publishDownloads, publishProgress, startBridge, toastOutcome } from "./steam/bridge";
-import { ensureArt, iconPng, SGDB_KINDS, SgdbKind, setSgdbArt } from "./steam/art";
-import { addToCollection, clearDerivedArt, ensureShortcut, setCapsule, waitForOverview } from "./steam/shortcuts";
-import { restoreAll } from "./steam/tweak";
-import { Connect } from "./ui/Connect";
-import { Home } from "./ui/Home";
-import { SgdbKey } from "./ui/SgdbKey";
+import {
+  addToCollection, clearDerivedArt, ensureArt, ensureShortcut, hasShortcut, iconPng, installSteam, launchIfRequested, publishDownloads,
+  setCapsule, setSgdbArt, SGDB_KINDS, SgdbKind, steamDiagnostics, steamProgress, syncSteam, toastOutcome, waitForOverview,
+} from "./steam";
+import { Connect } from "./ui/panel/Connect";
+import { Home } from "./ui/panel/Home";
+import { SgdbKey } from "./ui/panel/SgdbKey";
 import { ConsolePage, GamePage, StorePage } from "./ui/routes";
 
 function Content() {
@@ -67,24 +67,69 @@ async function prepareShortcut(rom_id: number): Promise<number> {
   return appid;
 }
 
+// A game in the queue or installed needs its shortcut (the Downloads page and the library show it through one).
+const NEEDS_SHORTCUT = new Set(["queued", "downloading", "paused", "installed"]);
+// A new shortcut's overview arrives a moment after it is recorded; only one still missing after this is gone.
+const SHORTCUT_SETTLE_MS = 5000;
+const MAX_REPAIRS = 2;
+
+/** Brings Steam's shortcuts back in line with the install ledger: recreates a missing one, forgets a stale appid. */
+function shortcutRepair(latest: () => State | undefined) {
+  const tries = new Map<number, number>();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let running = false;
+  const run = async () => {
+    timer = undefined;
+    if (running) return;
+    running = true;
+    try {
+      for (const i of latest()?.installs ?? []) {
+        const present = i.appid ? hasShortcut(i.appid) : false;
+        if (present !== false || (tries.get(i.rom_id) ?? 0) >= MAX_REPAIRS) continue;
+        tries.set(i.rom_id, (tries.get(i.rom_id) ?? 0) + 1);
+        if (NEEDS_SHORTCUT.has(i.state)) await prepareShortcut(i.rom_id).catch(() => 0);
+        else if (i.appid) await setShortcut(i.rom_id, 0).catch(() => undefined);
+      }
+    } finally {
+      running = false;
+    }
+  };
+  return {
+    check() {
+      if (timer === undefined) timer = setTimeout(() => void run(), SHORTCUT_SETTLE_MS);
+    },
+    stop() {
+      if (timer !== undefined) clearTimeout(timer);
+    },
+  };
+}
+
 export default definePlugin(() => {
   routerHook.addRoute(STORE_ROUTE, StorePage, { exact: true });
   routerHook.addRoute(GAME_ROUTE, GamePage, { exact: true });
   routerHook.addRoute(CONSOLE_ROUTE, ConsolePage, { exact: true });
   setDownloadPreparation(prepareShortcut);
   let latest: State | undefined;
-  const stopBridge = startBridge((action, appid, value) => downloadControl(action, appid, value));
+  const stopSteam = installSteam({
+    control: (action, appid, value) => downloadControl(action, appid, value),
+    uninstall: (rom_id) => removeFromDevice(rom_id),
+  });
+  const repair = shortcutRepair(() => latest);
+  const follow = (s: State) => {
+    latest = s;
+    syncSteam({ downloads: s.downloads.items, installs: s.installs ?? [], installed: s.installed ?? [] });
+    repair.check();
+  };
   const offState = onState((s) => {
     // Signed in through Steam's browser: leave it for the store rather than the SteamGridDB page.
     if (latest?.sgdb.signin?.active && !latest.sgdb.configured && s.sgdb.configured) {
       Navigation.Navigate(STORE_ROUTE);
       Navigation.CloseSideMenus();
     }
-    latest = s;
-    publishDownloads(s.downloads.items);
+    follow(s);
   });
   const offProgress = onProgress((p) => {
-    publishProgress(p);
+    steamProgress(p);
     toastOutcome(p, latest?.library.games.find((g) => g.rom_id === p.rom_id)?.name ?? "ChickenTender");
     // A multi-file game's launch file is only known once it is on disk.
     if (p.status === "done" && p.appid) {
@@ -95,15 +140,14 @@ export default definePlugin(() => {
   });
   getState()
     .then((s) => {
-      latest = s;
-      publishDownloads(s.downloads.items);
+      follow(s);
       // The Downloads rows show the wide art, which the previous instance's undo cleared.
       for (const d of s.downloads.items) if (d.appid) ensureArt(d.appid, d.name);
     })
     .catch(() => {});
   // Test hook for the Decky Toolkit (cef_evaluate): the same calls the UI makes.
   // publish feeds the Downloads page a made-up list (e.g. a download held at 40%) until the next backend event.
-  (window as any).__chickenTender = { download, remove: removeFromDevice, getState, publish: publishDownloads };
+  (window as any).__chickenTender = { download, remove: removeFromDevice, getState, publish: publishDownloads, steam: steamDiagnostics };
   return {
     name: "ChickenTender",
     titleView: <div className={staticClasses.Title}>ChickenTender</div>,
@@ -111,8 +155,8 @@ export default definePlugin(() => {
     icon: <FaDrumstickBite />,
     onDismount() {
       delete (window as any).__chickenTender;
-      restoreAll();
-      stopBridge();
+      repair.stop();
+      stopSteam();
       offState();
       offProgress();
       routerHook.removeRoute(STORE_ROUTE);

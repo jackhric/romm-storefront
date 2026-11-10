@@ -1,8 +1,9 @@
 // Fills a ROM shortcut's missing artwork through Steam's own custom-artwork call: its cover on a blurred copy of
 // itself, or a gradient coloured from its name when it has no cover (Steam draws the title over both). Only empty
 // slots are filled, and the undo clears exactly those.
-import { LogoPosition, logoPositionStore } from "./internals";
-import { tweak, warnOnce } from "./tweak";
+import { client, overview as overviewOf } from "./core/steam";
+import { LogoPosition, logoPositionStore } from "./downloads/internals";
+import { tweak, warnOnce } from "./core/tweak";
 
 // SetCustomArtworkForApp asset types and the grid file suffix Steam stores each under. The Downloads page shows
 // the wide one; the hero is for the game's own page. The icon is not artwork but a file path in shortcuts.vdf, set by
@@ -20,7 +21,7 @@ type Apps = {
 };
 
 function apps(): Apps | undefined {
-  const a = (window as any).SteamClient?.Apps;
+  const a = client("Apps");
   return typeof a?.SetCustomArtworkForApp === "function" && typeof a?.ClearCustomArtworkForApp === "function" ? a : undefined;
 }
 
@@ -199,7 +200,7 @@ export function setSgdbArt(appid: number, images: Partial<Record<SgdbKind, { bas
           }
           done.add(k);
         }
-        const overview = (window as any).appStore?.GetAppOverviewByAppID?.(appid);
+        const overview = overviewOf(appid);
         if (!cancelled && done.has("logo") && logos && overview) {
           await logos.SaveCustomLogoPosition(overview, LOGO_POSITION);
           if (cancelled) void logos.ClearCustomLogoPosition(overview);
