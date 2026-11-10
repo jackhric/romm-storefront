@@ -1,4 +1,4 @@
-"""What RetroDECK (the Flatpak) looks like on this Deck. Read-only: its config is the source of truth for folders."""
+"""What RetroDECK (the Flatpak) looks like on this device. Read-only: its config is the source of truth for folders."""
 import json
 import os
 import shutil

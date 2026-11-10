@@ -2,8 +2,9 @@ import { Focusable, NavEntryPositionPreferences } from "@decky/ui";
 import { memo, ReactNode, useMemo, useRef, useState } from "react";
 import { Game, Platform } from "../../api";
 import { reveal } from "./Card";
+import { consoleLogo } from "../consoleLogos";
 import { platformLogo } from "./model";
-import { CARD_GAP, MUTED, PAGE_X, STEAM, TILE_FACE, TILE_LIGHT } from "./theme";
+import { CARD_GAP, MUTED, PAGE_X, STEAM, TILE_FACE } from "./theme";
 
 const TILE = 160;
 
@@ -74,7 +75,8 @@ function Tile({ platform, count, onFocus, onOpen }: { platform: Platform; count:
 /** The square console face: Steam's dark surface, the logo lit from behind, an optional caption at the bottom. */
 export function ConsoleFace({ platform, size, focused, children }: { platform: Platform; size: number; focused?: boolean; children?: ReactNode }) {
   const [logoFailed, setLogoFailed] = useState(false);
-  const logo = logoFailed ? "" : platformLogo(platform);
+  const own = consoleLogo(platform.slug);
+  const logo = logoFailed ? "" : own || platformLogo(platform);
   const pad = Math.round(size * 0.07);
   return (
     <div
@@ -91,10 +93,10 @@ export function ConsoleFace({ platform, size, focused, children }: { platform: P
         padding: `${pad}px ${pad}px ${Math.round(pad * 0.9)}px`,
       }}
     >
-      <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", background: logo ? TILE_LIGHT : undefined, margin: `0 -${pad}px` }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: `${pad}px ${Math.round(pad * 0.6)}px` }}>
         {logo ? (
-          // IGDB pads older logos to a 160 px square of transparency, so the image takes the full height to show them large.
-          <img src={logo} alt="" onError={() => setLogoFailed(true)} style={{ height: "100%", maxWidth: "86%", objectFit: "contain", display: "block", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.3))" }} />
+          // Our own logos are prepared for dark surfaces; IGDB's come in every colour, many black, so those are whitened.
+          <img src={logo} alt="" onError={() => setLogoFailed(true)} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block", filter: own ? undefined : "brightness(0) invert(1)", opacity: 0.92 }} />
         ) : (
           <div style={{ color: STEAM.title, fontSize: Math.round(size / 9), fontWeight: 700, textAlign: "center", lineHeight: 1.15, padding: `0 ${pad}px` }}>{platform.name}</div>
         )}

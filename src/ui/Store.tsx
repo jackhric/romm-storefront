@@ -9,7 +9,7 @@ import { Hero } from "./store/Hero";
 import { useRotation } from "./store/HeroBackground";
 import { forYouRow, laterRows, openGame, recentRow, topRated, useGameDetails } from "./store/model";
 import { reveal } from "./store/Card";
-import { Guard, Page } from "./store/Page";
+import { Page } from "./store/Page";
 import { Row } from "./store/Row";
 import { needsSetup, SetupPage } from "./store/Setup";
 import { PAGE_X } from "./store/theme";
@@ -20,15 +20,7 @@ const FEATURED = 8;
 // The route page unmounts while a game or console page is open; this brings back the card or tile left from.
 const memory: { focused?: string } = {};
 
-export function StorePage() {
-  return (
-    <Guard what="the store">
-      <Storefront />
-    </Guard>
-  );
-}
-
-function Storefront() {
+export function Storefront() {
   const state = useBackendState();
   const progress = useProgress();
   const games = state?.library.games;

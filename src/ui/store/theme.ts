@@ -21,8 +21,6 @@ export const STEAM = {
 } as const;
 
 export const TILE_FACE = `linear-gradient(160deg, #2a475e 0%, ${STEAM.surface} 55%, #141d27 100%)`;
-// IGDB's console logos are dark or coloured artwork on transparency; a soft light behind them reads on the dark tile.
-export const TILE_LIGHT = "radial-gradient(ellipse 56% 52% at 50% 50%, rgba(236,241,245,0.96) 0%, rgba(218,227,234,0.82) 48%, rgba(199,213,224,0) 100%)";
 
 /** Own class names only. */
 export const CSS = `

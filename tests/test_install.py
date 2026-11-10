@@ -30,7 +30,7 @@ def test_target_status(tmp_path):
 
 
 def test_tilde_expands_to_the_given_home():
-    assert InstallLocation("~/retrodeck/roms", "/home/deck").roms_dir == "/home/deck/retrodeck/roms"
+    assert InstallLocation("~/retrodeck/roms", "/home/user").roms_dir == "/home/user/retrodeck/roms"
 
 
 def test_launch_file_prefers_playlist_then_cue(tmp_path):

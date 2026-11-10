@@ -1,7 +1,8 @@
-import { ButtonItem, Field, Navigation, PanelSection, PanelSectionRow, ProgressBarWithInfo, TextField } from "@decky/ui";
+import { ButtonItem, DropdownItem, Field, Navigation, PanelSection, PanelSectionRow, ProgressBarWithInfo, TextField } from "@decky/ui";
 import { useEffect, useState } from "react";
-import { clearSgdbKey, disconnect, STORE_ROUTE, setRomsDir, State } from "../api";
+import { clearSgdbKey, disconnect, STORE_ROUTE, setLayout, setRomsDir, State } from "../api";
 import { formatSize, useProgress } from "../state";
+import { variantFor, VARIANTS } from "./variants";
 
 export function Home({ state }: { state: State }) {
   const progress = useProgress();
@@ -19,7 +20,7 @@ export function Home({ state }: { state: State }) {
           <ButtonItem
             layout="below"
             disabled={games.length === 0}
-            description={error ? error : loading && games.length === 0 ? "Loading the library…" : `${games.length} games on ${platforms.length} platforms, ${installed} on this Deck`}
+            description={error ? error : loading && games.length === 0 ? "Loading the library…" : `${games.length} games on ${platforms.length} platforms, ${installed} on this device`}
             onClick={() => {
               Navigation.Navigate(STORE_ROUTE);
               Navigation.CloseSideMenus();
@@ -46,6 +47,14 @@ export function Home({ state }: { state: State }) {
       </PanelSection>
       <PanelSection title="Settings">
         <PanelSectionRow>
+          <DropdownItem
+            label="Store layout"
+            rgOptions={VARIANTS.map((v) => ({ data: v.key, label: v.name }))}
+            selectedOption={variantFor(state.layout).key}
+            onChange={(o) => setLayout(o.data)}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
           <TextField label="ROM folder" value={romsDir} onChange={(e) => setDir(e.target.value)}
             description={!state.roms_dir_exists ? "This folder does not exist."
               : state.retrodeck.installed ? `RetroDECK ${state.retrodeck.version}${state.retrodeck.initialised ? "" : " (not set up yet: run it once)"}; one subfolder per system.`
@@ -66,7 +75,7 @@ export function Home({ state }: { state: State }) {
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
-          <Field label={state.server.url.replace(/^https?:\/\//, "")} description={`${state.account.username || "signed in"} · RomM ${state.server.version || "?"} · this Deck is "${state.account.device_name}"`} />
+          <Field label={state.server.url.replace(/^https?:\/\//, "")} description={`${state.account.username || "signed in"} · RomM ${state.server.version || "?"} · this device is "${state.account.device_name}"`} />
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={() => disconnect()}>Disconnect</ButtonItem>

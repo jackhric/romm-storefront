@@ -1,7 +1,7 @@
 # Design
 
 ChickenTender is a rewrite of [romm-tender](https://github.com/danielcopper/romm-tender) that keeps one job:
-show the RomM library on the Deck, download what you pick, play it. Tender grew to ~190k lines of Python by
+show the RomM library on the device, download what you pick, play it. Tender grew to ~190k lines of Python by
 also doing save sync, BIOS management, playtime, a patched Steam game page and whole-platform syncs; none of
 that is in scope here.
 
@@ -15,7 +15,7 @@ that is in scope here.
   twice a second) because it must not resend the whole library.
 - **No Steam internals from the frontend.** Only `@decky/ui` and `@decky/api`; the library is a Decky route
   page built on `SidebarNavigation`, so it looks like Steam's own settings and gets gamepad focus for free.
-- **Nothing secret typed on the Deck.** Pairing uses RomM's device code flow; the token lives in a 0600 file.
+- **Nothing secret typed on the device.** Pairing uses RomM's device code flow; the token lives in a 0600 file.
 
 ## Backend (`py_modules/chickentender/`)
 
@@ -49,7 +49,7 @@ that is in scope here.
   Access menu to finish setup") instead of the store.
 - `ui/Store.tsx` (route `/chickentender`): the storefront. Hero with the animated backdrop, "Recently added",
   the "By Console" strip (square tiles in Steam's colours with the IGDB logo; a tile opens that console's page), "For you" from
-  RomM's recommendations, "Top rated", "On this Deck". Pieces live in `ui/store/` (`Hero`, `HeroBackground`,
+  RomM's recommendations, "Top rated", "On this Device". Pieces live in `ui/store/` (`Hero`, `HeroBackground`,
   `Consoles`, `Row`, `Card`, `Page` with the `Guard` boundary, `model` for rows, labels and the modal flows).
 - `ui/GamePage.tsx` (route `/chickentender/game/:rom_id`): the layout chosen in the bake-off
   (`docs/storefront-brief.md`, variant B3): a tall sharp-screenshot hero with the title, a publisher · year ·
@@ -70,7 +70,7 @@ that is in scope here.
 - `index.tsx`: registers the three routes, installs the Steam hooks and picks `Connect`, `SgdbKey` or `Home` for the
   panel.
 
-Gamepad focus lessons (verified on the Deck): strips are `Focusable flow-children="row"` inside a column
+Gamepad focus lessons (verified on the device): strips are `Focusable flow-children="row"` inside a column
 `Focusable` with `navEntryPreferPosition={MAINTAIN_X}` so up/down keeps the column; Steam smooth-scrolls the
 focused element into view ~80 ms after focus, so the page ends 42 px above Steam's footer and uses
 `scrollPaddingTop`; a freshly mounted route page gets no gamepad focus and `preferredFocus` is ignored, but a DOM
@@ -182,8 +182,8 @@ once. Only `ngc` → `gc` and `dc` → `dreamcast` differ between RomM slugs and
 
 1. **Done**: pair, list, download with progress and resume, status from disk; Steam shortcut with art in a "RomM"
    collection for every downloaded game, launch through RetroDECK, downloads on Steam's Downloads page, remove.
-   All verified on the Deck.
+   All verified on the device.
 2. **Done**: the storefront (hero, Recently added, By Console tiles and console pages, For you, Top rated,
-   On this Deck), the game detail page and card captions picked in a bake-off; Downloads-page parity.
+   On this Device), the game detail page and card captions picked in a bake-off; Downloads-page parity.
 3. Later, only if wanted: offer a Flathub install of RetroDECK when missing, BIOS check against RomM's firmware
    list, play sessions reported to RomM, persisted "Completed" rows.

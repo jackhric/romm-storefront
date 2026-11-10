@@ -16,7 +16,7 @@ Refresh the copy with `curl -sS https://<romm>/openapi.json -o docs/romm-openapi
 | `POST /api/auth/device/init` | start pairing: returns `user_code` and `device_code`, no auth |
 | `POST /api/auth/device/token` | poll with `device_code` until approved: `access_token`, `device_id` |
 | `GET /api/users/me` | who the token belongs to |
-| `PUT /api/devices/{id}` | describe this Deck (client, version) |
+| `PUT /api/devices/{id}` | describe this device (client, version) |
 | `GET /api/platforms` | platforms with `rom_count` |
 | `GET /api/roms?limit&offset&order_by=name` | the library, paged (`with_*` extras off) |
 | `GET /api/roms/{id}` | one game with its `files` |

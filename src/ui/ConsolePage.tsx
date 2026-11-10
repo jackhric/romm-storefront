@@ -1,11 +1,11 @@
 // One console's library (/chickentender/console/:platform_id): a header and a grid of covers, like a Steam collection.
-import { Focusable, Navigation, NavEntryPositionPreferences, SteamSpinner, useParams } from "@decky/ui";
+import { Focusable, Navigation, NavEntryPositionPreferences, SteamSpinner } from "@decky/ui";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { consoleRoute, Game, gameRoute } from "../api";
 import { useBackendState, useProgress } from "../state";
 import { Card, reveal } from "./store/Card";
 import { ConsoleFace } from "./store/Consoles";
-import { Guard, Page } from "./store/Page";
+import { Page } from "./store/Page";
 import { needsSetup, SetupPage } from "./store/Setup";
 import { MUTED, PAGE_X, STEAM } from "./store/theme";
 
@@ -32,16 +32,7 @@ export function openConsole(platformId: number) {
   Navigation.Navigate(consoleRoute(platformId));
 }
 
-export function ConsolePage() {
-  const { platform_id } = useParams<{ platform_id: string }>();
-  return (
-    <Guard what="this console">
-      <ConsoleView key={platform_id} platformId={Number(platform_id)} />
-    </Guard>
-  );
-}
-
-function ConsoleView({ platformId }: { platformId: number }) {
+export function ConsoleView({ platformId }: { platformId: number }) {
   const state = useBackendState();
   const progress = useProgress();
   const [sort, setSort] = useState(memory.sort);
@@ -111,7 +102,7 @@ function ConsoleView({ platformId }: { platformId: number }) {
             <div style={{ fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", color: STEAM.muted }}>Console</div>
             <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.1, color: STEAM.title, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{platform.name}</div>
             <div style={{ fontSize: 14, color: MUTED }}>
-              {games.length} {games.length === 1 ? "game" : "games"} · {installed} on this Deck
+              {games.length} {games.length === 1 ? "game" : "games"} · {installed} on this device
             </div>
           </div>
           <SortControl value={sort} onChange={choose} />

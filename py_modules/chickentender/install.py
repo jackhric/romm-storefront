@@ -1,4 +1,4 @@
-"""Where a game lives on the Deck: RetroDECK's ROM folder, one ES-DE system folder per RomM platform."""
+"""Where a game lives on the device: RetroDECK's ROM folder, one ES-DE system folder per RomM platform."""
 import os
 from dataclasses import dataclass
 

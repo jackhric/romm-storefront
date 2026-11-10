@@ -16,7 +16,7 @@ matching the current store. Sizes are CSS px at 1080p.
 
 ## A. Findings per platform
 
-### Steam Deck / Big Picture library game page
+### Steam device / Big Picture library game page
 Top to bottom: full-width hero art (Steam asset 3840x1240, ~3.1:1) with the logo (max 1280x720 asset) placed
 bottom-left over it; a dark play bar directly under the hero: large Play/Install button (green Play, blue
 Install), then small icon buttons (controller layout, settings cog), then a facts strip of short
@@ -27,7 +27,7 @@ Focus starts on the Play button; pressing down moves to the tabs. Critique: syno
 - https://blog.parrot9.com/steam-case-study/
 - https://github.com/Leon-Swains/game-glance (Decky plugin rebuilding the page: hero full screen, pill Play, round icon buttons)
 
-### Steam Deck store / library grid
+### Steam device store / library grid
 Library capsules are 2:3 portrait (asset 600x900). The grid shows covers only: no title, no size under the
 tile; the title appears in a tooltip-like label when focused, and install state is shown by dimming/icon.
 The focused tile scales up slightly (~1.05-1.1) with a light outline and drop shadow. Collections pages have

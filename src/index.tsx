@@ -2,7 +2,7 @@ import { Navigation, PanelSection, PanelSectionRow, Spinner, staticClasses } fro
 import { definePlugin, routerHook } from "@decky/api";
 import { FaDrumstickBite } from "react-icons/fa";
 import { ArtBytes, artBase64, coverBase64, download, downloadControl, GameArt, gameArt, getState, launchTarget, onProgress, onState, saveIcon, setDownloadPreparation, setShortcut, State, STORE_ROUTE, GAME_ROUTE, CONSOLE_ROUTE } from "./api";
-import { removeFromDeck } from "./actions";
+import { removeFromDevice } from "./actions";
 import { useBackendState } from "./state";
 import { launchIfRequested, publishDownloads, publishProgress, startBridge, toastOutcome } from "./steam/bridge";
 import { ensureArt, iconPng, SGDB_KINDS, SgdbKind, setSgdbArt } from "./steam/art";
@@ -11,9 +11,7 @@ import { restoreAll } from "./steam/tweak";
 import { Connect } from "./ui/Connect";
 import { Home } from "./ui/Home";
 import { SgdbKey } from "./ui/SgdbKey";
-import { StorePage } from "./ui/Store";
-import { GamePage } from "./ui/GamePage";
-import { ConsolePage } from "./ui/ConsolePage";
+import { ConsolePage, GamePage, StorePage } from "./ui/routes";
 
 function Content() {
   const state = useBackendState();
@@ -105,7 +103,7 @@ export default definePlugin(() => {
     .catch(() => {});
   // Test hook for the Decky Toolkit (cef_evaluate): the same calls the UI makes.
   // publish feeds the Downloads page a made-up list (e.g. a download held at 40%) until the next backend event.
-  (window as any).__chickenTender = { download, remove: removeFromDeck, getState, publish: publishDownloads };
+  (window as any).__chickenTender = { download, remove: removeFromDevice, getState, publish: publishDownloads };
   return {
     name: "ChickenTender",
     titleView: <div className={staticClasses.Title}>ChickenTender</div>,

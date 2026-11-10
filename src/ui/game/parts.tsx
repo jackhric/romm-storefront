@@ -4,10 +4,10 @@ import { ConfirmModal, DialogButton, Focusable, GamepadButton, GamepadEvent, Men
 import { CSSProperties, ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { FaEllipsisH } from "react-icons/fa";
 import { cancelDownload, download, Game, GameDetails, gameRoute, Progress, Recommendation, similarGames } from "../../api";
-import { removeFromDeck } from "../../actions";
+import { removeFromDevice } from "../../actions";
 import { formatSize, useBackendState, useProgress } from "../../state";
 import { reveal } from "../store/Card";
-import { actionLabel, backdropOf, percent, Row as RowModel, similarRow, useGameDetails } from "../store/model";
+import { actionLabel, backdropOf, percent, Row as RowModel, similarRow, useDetailsState } from "../store/model";
 import { Row } from "../store/Row";
 import { ACCENT, MUTED, PAGE_X, TEXT } from "../store/theme";
 import { bpx } from "../store/theme";
@@ -15,6 +15,8 @@ import { bpx } from "../store/theme";
 export interface GameData {
   game: Game;
   details?: GameDetails;
+  /** Details are known (or failed): decide art that depends on them only when this is true. */
+  settled: boolean;
   progress: Record<number, Progress>;
   more?: RowModel;
   shots: string[];
@@ -27,7 +29,7 @@ export function useGameData(romId: number) {
   const state = useBackendState();
   const progress = useProgress();
   const game = state?.library.games.find((g) => g.rom_id === romId);
-  const details = useGameDetails(romId);
+  const { details, settled } = useDetailsState(romId, true);
   const [similar, setSimilar] = useState<Recommendation[]>();
   useEffect(() => {
     let live = true;
@@ -42,6 +44,7 @@ export function useGameData(romId: number) {
   const data: GameData | undefined = game && {
     game,
     details,
+    settled,
     progress,
     more,
     shots,
@@ -131,10 +134,10 @@ function useAction(game: Game) {
       showModal(
         <ConfirmModal
           strTitle={game.name}
-          strDescription="Remove this game from the Deck? Its files and its Steam shortcut are deleted; the game stays on your RomM server."
+          strDescription="Remove this game from the device? Its files and its Steam shortcut are deleted; the game stays on your RomM server."
           strOKButtonText="Remove"
           bDestructiveWarning
-          onOK={() => run(() => removeFromDeck(game.rom_id))}
+          onOK={() => run(() => removeFromDevice(game.rom_id))}
         />,
       );
     } else if (isBusy(game)) {
@@ -217,7 +220,7 @@ export function ProgressNote({ game, progress, width, fontSize = bpx(15) }: { ga
       </div>
     );
   }
-  if (game.status === "installed") return <div style={{ fontSize, color: "#8bc53f", whiteSpace: "nowrap" }}>On this Deck</div>;
+  if (game.status === "installed") return <div style={{ fontSize, color: "#8bc53f", whiteSpace: "nowrap" }}>On this Device</div>;
   if (game.status === "partial") return <div style={{ fontSize, color: MUTED, whiteSpace: "nowrap" }}>Partly downloaded</div>;
   return null;
 }

@@ -25,6 +25,7 @@ import shutil
 from .romm import MIN_VERSION, RommClient, RommError, normalize_url, parse_version, ssl_context
 from .sgdb import KINDS as ART_KINDS, SgdbClient, SgdbError
 from .settings import Settings, SettingsStore
+from .video import VideoResolver
 from .signin import SgdbSignin
 
 STATE_EVENT = "chickentender_state"
@@ -41,7 +42,7 @@ def device_identity(version: str) -> dict:
         machine = socket.gethostname()
     return {
         "client_device_identifier": hashlib.sha256(machine.encode()).hexdigest()[:32],
-        "name": socket.gethostname() or "Steam Deck",
+        "name": socket.gethostname() or "Steam device",
         "client": CLIENT,
         "platform": "steamos",
         "client_version": version,
@@ -63,6 +64,7 @@ class App:
         self.pairing: DevicePairing | None = None
         self.server: dict[str, Any] = {"version": "", "error": ""}
         self.library = Library()
+        self.videos = VideoResolver(log=logger)
         self.retrodeck = retrodeck.detect(home)
         self.shortcuts = ShortcutMap(os.path.join(os.path.dirname(settings_path), "shortcuts.json"))
         self.launcher = ""
@@ -137,6 +139,7 @@ class App:
             "sgdb": {"configured": self.sgdb is not None, "error": self.sgdb_error,
                      "art_ready": self.art.count(self.library.games.values()), "art_total": len(self.library.games),
                      "signin": self.signin.as_dict()},
+            "layout": s.layout,
             "version": self.version,
         }
 
@@ -179,7 +182,7 @@ class App:
         await self._probe_server(emit=False)
         if self.settings.server_url != url:
             await self.prefetch.stop()
-            self.settings = Settings(server_url=url, roms_dir=self.settings.roms_dir, sgdb_key=self.settings.sgdb_key)
+            self.settings = Settings(server_url=url, roms_dir=self.settings.roms_dir, sgdb_key=self.settings.sgdb_key, layout=self.settings.layout)
             self.store.save(self.settings)
             self.library = Library()
         self._changed()
@@ -254,7 +257,7 @@ class App:
         if self.client:
             await self.client.close()
             self.client = None
-        self.settings = Settings(roms_dir=self.settings.roms_dir, sgdb_key=self.settings.sgdb_key)
+        self.settings = Settings(roms_dir=self.settings.roms_dir, sgdb_key=self.settings.sgdb_key, layout=self.settings.layout)
         self.store.save(self.settings)
         self.server = {"version": "", "error": ""}
         self.library = Library()
@@ -266,7 +269,7 @@ class App:
         if self.settings.paired and self.client and not self.library.loading:
             await self.library.refresh(self.client)
             if self.library.error and "401" in self.library.error:
-                self.library.error = "RomM no longer accepts this Deck; disconnect and pair again"
+                self.library.error = "RomM no longer accepts this device; disconnect and pair again"
             elif not self.library.error and self.sgdb and not self.sgdb_error and not self.prefetch.running:
                 self.prefetch.start(self.sgdb, self.library.games.values())
             self._changed()
@@ -285,6 +288,18 @@ class App:
         if not game or not self.client:
             raise ValueError("Unknown game")
         return game.details(self.client)
+
+    async def set_layout(self, layout: str) -> dict:
+        self.settings.layout = str(layout)[:32]
+        self.store.save(self.settings)
+        self._changed()
+        return self.state()
+
+    async def game_video(self, rom_id: int) -> dict:
+        """Direct stream addresses for the game's trailer ("" each when it has none or it cannot be resolved)."""
+        game = self.library.games.get(int(rom_id))
+        video_id = (game.raw.get("youtube_video_id") or "") if game else ""
+        return {"rom_id": int(rom_id), **(await self.videos.resolve(video_id))}
 
     async def cover_base64(self, rom_id: int) -> dict:
         """The game's cover for Steam's custom artwork call (the Steam webview cannot fetch it cross-origin itself)."""

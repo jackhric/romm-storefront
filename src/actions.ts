@@ -4,7 +4,7 @@ import { publishDownloads } from "./steam/bridge";
 import { removeShortcut } from "./steam/shortcuts";
 
 /** Deletes the files and the Steam shortcut of a downloaded game. */
-export async function removeFromDeck(rom_id: number): Promise<State> {
+export async function removeFromDevice(rom_id: number): Promise<State> {
   const s = await removeGame(rom_id);
   // The Downloads page reads each item's app overview, so the item must be gone before the shortcut is.
   publishDownloads(s.downloads.items);

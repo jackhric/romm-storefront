@@ -34,6 +34,6 @@ function focusMeta(game: Game, p?: Progress): string {
   const system = game.slug.toUpperCase();
   if (p && p.status === "downloading") return `Downloading ${Math.round(percent(p))} %`;
   if (game.status === "queued") return "Queued";
-  if (game.status === "installed") return `${system} · On this Deck`;
+  if (game.status === "installed") return `${system} · On this Device`;
   return [system, game.release_year, formatSize(game.size_bytes)].filter(Boolean).join(" · ");
 }

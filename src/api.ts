@@ -44,6 +44,22 @@ export interface GameDetails {
   player_count: string;
   franchises: string[];
   fs_name: string;
+  /** A video file RomM hosts for the game, or "". */
+  video: string;
+  /** ISO date (YYYY-MM-DD) or "". */
+  released: string;
+  genres: string[];
+  themes: string[];
+  perspectives: string[];
+  /** IGDB's 0-100 scores, null when RomM has none. */
+  user_score: number | null;
+  user_score_count: number;
+  critic_score: number | null;
+  age_ratings: { rating: string; category: string; cover: string }[];
+  hltb: { main_story?: number; main_plus_extra?: number; completionist?: number };
+  /** Number of RetroAchievements. */
+  achievements: number;
+  last_played: string;
 }
 
 export interface Platform { id: number; name: string; slug: string; rom_count: number; /** IGDB platform logo URL, or "" */ logo: string }
@@ -97,6 +113,8 @@ export interface State {
   roms_dir_exists: boolean;
   retrodeck: { installed: boolean; initialised: boolean; version: string; roms_path: string };
   sgdb: { configured: boolean; error: string; art_ready: number; art_total: number; signin: SgdbSignin };
+  /** The storefront layout picked in the panel; "" for the default. */
+  layout: string;
   version: string;
 }
 
@@ -147,6 +165,9 @@ export async function download(rom_id: number): Promise<State> {
   }
   return backendDownload(rom_id, appid);
 }
+/** Direct stream addresses for the game's trailer at about 360p and 720p (both silent) and its sound; "" when not resolved. */
+export const gameVideo = callable<[rom_id: number], { rom_id: number; small: string; large: string; audio: string }>("game_video");
+export const setLayout = callable<[layout: string], State>("set_layout");
 export const setRomsDir = callable<[path: string], State>("set_roms_dir");
 
 const STATE_EVENT = "chickentender_state";

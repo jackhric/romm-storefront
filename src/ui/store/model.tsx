@@ -1,6 +1,6 @@
 import { ConfirmModal, showModal } from "@decky/ui";
 import { useEffect, useState } from "react";
-import { removeFromDeck } from "../../actions";
+import { removeFromDevice } from "../../actions";
 import { cancelDownload, download, Game, GameDetails, gameDetails, Platform, Progress, Recommendation } from "../../api";
 import { formatSize } from "../../state";
 
@@ -20,13 +20,13 @@ export function recentRow(games: Game[]): Row | undefined {
   return recent.length ? { key: "recent", title: "Recently added", subtitle: "New on your RomM server", games: recent } : undefined;
 }
 
-/** "Top rated" and "On this Deck", the rows below the personal ones. */
+/** "Top rated" and "On this Device", the rows below the personal ones. */
 export function laterRows(games: Game[]): Row[] {
   const rows: Row[] = [];
   const rated = topRated(games).slice(0, ROW_LIMIT);
   if (rated.length) rows.push({ key: "rated", title: "Top rated", subtitle: "Best reviewed in the library", games: rated });
   const installed = games.filter((g) => g.status === "installed");
-  if (installed.length) rows.push({ key: "installed", title: "On this Deck", subtitle: `${installed.length} ready to play`, games: installed });
+  if (installed.length) rows.push({ key: "installed", title: "On this Device", subtitle: `${installed.length} ready to play`, games: installed });
   return rows;
 }
 
@@ -97,7 +97,7 @@ export function percent(p?: Progress): number {
 export function statusLine(game: Game, p?: Progress): string {
   if (p && p.status === "downloading") return `${Math.round(percent(p))}%${p.bps ? ` · ${formatSize(p.bps)}/s` : ""}`;
   switch (game.status) {
-    case "installed": return "On this Deck";
+    case "installed": return "On this Device";
     case "queued": return "Queued";
     case "downloading": return "Starting…";
     case "partial": return `${formatSize(game.size_bytes)} · resume`;
@@ -108,7 +108,7 @@ export function statusLine(game: Game, p?: Progress): string {
 /** The one verb the primary button and the A-button legend show for a game. */
 export function actionLabel(game: Game): string {
   switch (game.status) {
-    case "installed": return "Remove from this Deck";
+    case "installed": return "Remove from this device";
     case "queued":
     case "downloading": return "Stop download";
     case "partial": return "Resume";
@@ -128,10 +128,10 @@ export function openGame(game: Game) {
     showModal(
       <ConfirmModal
         strTitle={game.name}
-        strDescription="Remove this game from the Deck? Its files and its Steam shortcut are deleted; the game stays on your RomM server."
+        strDescription="Remove this game from the device? Its files and its Steam shortcut are deleted; the game stays on your RomM server."
         strOKButtonText="Remove"
         bDestructiveWarning
-        onOK={() => removeFromDeck(game.rom_id)}
+        onOK={() => removeFromDevice(game.rom_id)}
       />,
     );
     return;
@@ -143,7 +143,7 @@ export function openGame(game: Game) {
   showModal(
     <ConfirmModal
       strTitle={game.name}
-      strDescription={`${game.platform} · ${formatSize(game.size_bytes)}${game.multi ? " · several files" : ""}. Download to this Deck?`}
+      strDescription={`${game.platform} · ${formatSize(game.size_bytes)}${game.multi ? " · several files" : ""}. Download to this device?`}
       strOKButtonText={game.status === "partial" ? "Resume" : "Download"}
       onOK={() => download(game.rom_id)}
     />,
@@ -165,24 +165,45 @@ function fetchDetails(romId: number): Promise<GameDetails> {
   return p;
 }
 
-/** Details of one game, fetched once a short pause after it is selected so scrolling a row does not fetch every card. */
-export function useGameDetails(romId: number | undefined): GameDetails | undefined {
-  const [details, setDetails] = useState<GameDetails>();
+/** Starts fetching a game's details so they are cached before a page asks for them. */
+export function prefetchDetails(romId: number): void {
+  if (!detailsCache.has(romId)) fetchDetails(romId).catch(() => {});
+}
+
+export interface DetailsState {
+  details?: GameDetails;
+  /** True once the details are known or the fetch has failed: what depends on them can be decided. */
+  settled: boolean;
+}
+
+/**
+ * Details of one game. The default waits a short pause after the game is selected so scrolling a row does not
+ * fetch every card; `immediate` (a game page) fetches at once. A cached value is returned on the first render.
+ */
+export function useDetailsState(romId: number | undefined, immediate = false): DetailsState {
+  const [, rerender] = useState(0);
+  const [failed, setFailed] = useState<number>();
   useEffect(() => {
-    if (romId === undefined) return;
-    const cached = detailsCache.get(romId);
-    if (cached) {
-      setDetails(cached);
-      return;
-    }
+    if (romId === undefined || detailsCache.has(romId)) return;
     let live = true;
-    const timer = setTimeout(() => {
-      fetchDetails(romId).then((d) => live && setDetails(d)).catch(() => {});
-    }, 300);
+    const start = () =>
+      fetchDetails(romId).then(() => live && rerender((n) => n + 1)).catch(() => live && setFailed(romId));
+    if (immediate) {
+      start();
+      return () => {
+        live = false;
+      };
+    }
+    const timer = setTimeout(start, 300);
     return () => {
       live = false;
       clearTimeout(timer);
     };
-  }, [romId]);
-  return details && details.rom_id === romId ? details : undefined;
+  }, [romId, immediate]);
+  const details = romId === undefined ? undefined : detailsCache.get(romId);
+  return { details, settled: !!details || (romId !== undefined && failed === romId) };
+}
+
+export function useGameDetails(romId: number | undefined): GameDetails | undefined {
+  return useDetailsState(romId).details;
 }

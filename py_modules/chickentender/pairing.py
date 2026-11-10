@@ -1,4 +1,4 @@
-"""RomM's device code flow: the Deck shows a short code, the owner approves it in RomM's web UI, we poll for the token."""
+"""RomM's device code flow: the device shows a short code, the owner approves it in RomM's web UI, we poll for the token."""
 import asyncio
 import time
 from collections.abc import Awaitable, Callable

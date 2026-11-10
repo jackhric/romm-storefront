@@ -59,7 +59,7 @@ export function Hero({ game, details, progress, onOpen, onButtonFocus }: Props) 
                 </div>
               ) : (
                 <>
-                  <div>{game.status === "installed" ? "On this Deck · " : ""}{formatSize(game.size_bytes)}{game.multi ? " · several files" : ""}</div>
+                  <div>{game.status === "installed" ? "On this Device · " : ""}{formatSize(game.size_bytes)}{game.multi ? " · several files" : ""}</div>
                   {credits && <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{credits}</div>}
                 </>
               )}

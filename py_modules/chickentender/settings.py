@@ -13,6 +13,7 @@ class Settings:
     scopes: list[str] = field(default_factory=list)
     roms_dir: str = ""
     sgdb_key: str = ""
+    layout: str = ""
 
     @property
     def paired(self) -> bool:

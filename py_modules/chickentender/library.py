@@ -1,10 +1,19 @@
-"""The RomM library as the panel shows it: platforms and games, each game with its status on this Deck."""
+"""The RomM library as the panel shows it: platforms and games, each game with its status on this device."""
 import time
 from dataclasses import dataclass, field
 
 from .install import InstallLocation
 from .romm import RommClient
 from .sgdb import KINDS as ART_KINDS
+
+
+def _score(value) -> int | None:
+    """RomM passes IGDB's 0-100 ratings through as strings."""
+    try:
+        n = round(float(value))
+    except (TypeError, ValueError):
+        return None
+    return n if 0 < n <= 100 else None
 
 
 @dataclass
@@ -56,19 +65,35 @@ class Game:
     def details(self, client: RommClient) -> dict:
         """The long fields the storefront shows for one game at a time (kept out of the snapshot)."""
         r, meta = self.raw, self.raw.get("metadatum") or {}
+        igdb = r.get("igdb_metadata") or {}
+        hltb = r.get("hltb_metadata") or {}
+        released = meta.get("first_release_date")
+        video = r.get("path_video") or ""
         return {
             "rom_id": self.rom_id,
             "summary": r.get("summary") or "",
-            "screenshots": [client.url(u) for u in (r.get("merged_screenshots") or [])[:6]],
+            "screenshots": [client.url(u) for u in (r.get("merged_screenshots") or [])[:24]],
             "youtube_video_id": r.get("youtube_video_id") or "",
+            "video": client.url(video) if video else "",
             "developers": list(meta.get("developers") or meta.get("companies") or [])[:3],
             "publishers": list(meta.get("publishers") or [])[:2],
             "game_modes": list(meta.get("game_modes") or []),
             "player_count": meta.get("player_count") or "",
             "franchises": list(meta.get("franchises") or []),
             "fs_name": self.fs_name,
+            "released": time.strftime("%Y-%m-%d", time.gmtime(released / 1000)) if isinstance(released, (int, float)) and released > 0 else "",
+            "genres": list(meta.get("genres") or []),
+            "themes": [t for t in (igdb.get("themes") or []) if isinstance(t, str)],
+            "perspectives": [t for t in (igdb.get("player_perspectives") or []) if isinstance(t, str)],
+            "user_score": _score(igdb.get("total_rating")),
+            "user_score_count": igdb.get("total_rating_count") if isinstance(igdb.get("total_rating_count"), int) else 0,
+            "critic_score": _score(igdb.get("aggregated_rating")),
+            "age_ratings": [{"rating": str(a.get("rating") or ""), "category": str(a.get("category") or ""), "cover": a.get("rating_cover_url") or ""}
+                            for a in (igdb.get("age_ratings") or []) if isinstance(a, dict)][:4],
+            "hltb": {k: hltb[k] for k in ("main_story", "main_plus_extra", "completionist") if isinstance(hltb.get(k), int) and hltb[k] > 0},
+            "achievements": len(((r.get("merged_ra_metadata") or {}).get("achievements")) or []),
+            "last_played": ((r.get("rom_user") or {}).get("last_played")) or "",
         }
-
 
 class Library:
     def __init__(self):

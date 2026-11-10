@@ -60,8 +60,8 @@ export function Connect({ state }: { state: State }) {
       )}
       {serverOk && (
         <PanelSectionRow>
-          <ButtonItem layout="below" disabled={busy} onClick={() => run(startPairing)} description={pairingNote || "Shows a code to approve in RomM's web UI; no password is typed on the Deck."}>
-            Pair this Deck
+          <ButtonItem layout="below" disabled={busy} onClick={() => run(startPairing)} description={pairingNote || "Shows a code to approve in RomM's web UI; no password is typed on the device."}>
+            Pair this device
           </ButtonItem>
         </PanelSectionRow>
       )}

@@ -92,5 +92,11 @@ class Plugin:
     async def art_base64(self, rom_id: int, kind: str) -> dict:
         return await self.app.art_base64(rom_id, kind)
 
+    async def game_video(self, rom_id: int) -> dict:
+        return await self.app.game_video(rom_id)
+
+    async def set_layout(self, layout: str) -> dict:
+        return await self.app.set_layout(layout)
+
     async def set_roms_dir(self, path: str) -> dict:
         return await self.app.set_roms_dir(path)

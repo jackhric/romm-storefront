@@ -55,3 +55,11 @@ out/*
 cli/
 cli/*
 cli/decky
+
+# Vendored at install time: uv pip install --target py_modules --no-deps yt-dlp
+py_modules/yt_dlp/
+py_modules/yt_dlp-*.dist-info/
+
+# Reference captures (they show a signed-in Steam account)
+docs/reference/
+py_modules/.lock
